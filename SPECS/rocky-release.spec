@@ -10,7 +10,7 @@
 
 Name:           rlc-pro-lts-release
 Version:        9.6
-Release:        3.5%{?dist}
+Release:        3.6%{?dist}
 Summary:        Rocky Linux from CIQ release files
 Group:          System Environment/Base
 License:        BSD-3-Clause
@@ -65,6 +65,7 @@ Provides:       redhat-release-eula = 9.6-1.0
 Provides:       centos-release-eula = %{version}-%{release}
 
 # What are our requirements?
+Requires:       ciq-rocky-release = %{version}-%{release}
 Requires:       rlc-pro-lts-repos(9) = 9.6
 Requires:       rlc-pro-lts-gpg-keys = %{version}-%{release}
 
@@ -135,6 +136,15 @@ Source1452:     rocky-kernelsecurityupdate-aarch64.der
 
 %description
 Rocky Linux from CIQ release files.
+
+%package     -n ciq-rocky-release
+Summary:        Rocky-compatible release files for Rocky Linux from CIQ
+License:        BSD-3-Clause
+
+%description -n ciq-rocky-release
+Owns /etc/os-release (a link to /usr/lib/os-release, which the release package
+ships), /etc/issue, /etc/redhat-release and /etc/rocky-release. Installers match
+the name and version of the package that owns /etc/os-release to detect Rocky.
 
 %package     -n rlc-pro-lts-repos
 Summary:        Rocky Linux from CIQ Package Repositories
@@ -226,13 +236,11 @@ install -d -m 0755 %{buildroot}%{_sysconfdir}
 cat > %{buildroot}%{_sysconfdir}/ciq-release <<'EOF'
 Rocky Linux from CIQ Pro LTS release 9.6 (Blue Onyx)
 EOF
-ln -s ciq-release %{buildroot}%{_sysconfdir}/system-release
-cat > %{buildroot}%{_sysconfdir}/redhat-release <<'EOF'
-Red Hat Enterprise Linux release 9.6 (Plow)
-EOF
+ln -s rocky-release %{buildroot}%{_sysconfdir}/system-release
 cat > %{buildroot}%{_sysconfdir}/rocky-release <<'EOF'
 Rocky Linux release 9.6 (Blue Onyx)
 EOF
+ln -s rocky-release %{buildroot}%{_sysconfdir}/redhat-release
 mkdir -p %{buildroot}%{_mandir}/man1
 install -p -m 0644 %{SOURCE1300} %{buildroot}%{_mandir}/man1/
 
@@ -262,7 +270,7 @@ REDHAT_SUPPORT_PRODUCT="Rocky Linux from CIQ Pro LTS"
 REDHAT_SUPPORT_PRODUCT_VERSION="9.6"
 EOF
 
-# Create the symlink for /etc/os-release
+# Create the symlink for /etc/os-release (owned by the ciq-rocky-release subpackage)
 ln -s ../usr/lib/os-release %{buildroot}%{_sysconfdir}/os-release
 
 # write cpe to /etc/system-release-cpe
@@ -270,10 +278,11 @@ cat > %{buildroot}%{_sysconfdir}/system-release-cpe <<'EOF'
 cpe:2.3:o:ciq:rocky_linux_from_ciq_pro_lts:9.6:*:*:*:*:*:*:*
 EOF
 
-# create /etc/issue, /etc/issue.net and /etc/issue.d
-echo '\S' > %{buildroot}%{_sysconfdir}/issue
-echo 'Kernel \r on \m' >> %{buildroot}%{_sysconfdir}/issue
-cp %{buildroot}%{_sysconfdir}/issue{,.net}
+# create /etc/issue.net and /etc/issue.d
+echo '\S' > %{buildroot}%{_sysconfdir}/issue.net
+echo 'Kernel \r on \m' >> %{buildroot}%{_sysconfdir}/issue.net
+# /etc/issue belongs to the ciq-rocky-release subpackage
+cp %{buildroot}%{_sysconfdir}/issue{.net,}
 echo >> %{buildroot}%{_sysconfdir}/issue
 mkdir -p %{buildroot}%{_sysconfdir}/issue.d
 
@@ -485,13 +494,9 @@ awk '/^product_name = Rocky Linux$/ { print "product_name = " ENVIRON["BASIL_PRO
 %license docs/LICENSE
 %doc docs/Contributors docs/COMMUNITY-CHARTER
 %dir %{_sysconfdir}/yum.repos.d
-%{_sysconfdir}/redhat-release
 %{_sysconfdir}/system-release
-%{_sysconfdir}/rocky-release
 %{_sysconfdir}/ciq-release
-%config(noreplace) %{_sysconfdir}/os-release
 %config %{_sysconfdir}/system-release-cpe
-%config(noreplace) %{_sysconfdir}/issue
 %config(noreplace) %{_sysconfdir}/issue.net
 %dir %{_sysconfdir}/issue.d
 %{_rpmmacrodir}/macros.dist
@@ -503,6 +508,13 @@ awk '/^product_name = Rocky Linux$/ { print "product_name = " ENVIRON["BASIL_PRO
 %{_prefix}/lib/systemd/user-preset/*
 %{_prefix}/lib/sysctl.d/50-redhat.conf
 %{_mandir}/man1/rocky.1.gz
+
+%files -n ciq-rocky-release
+%license docs/LICENSE
+%config(noreplace) %{_sysconfdir}/os-release
+%{_sysconfdir}/redhat-release
+%{_sysconfdir}/rocky-release
+%config(noreplace) %{_sysconfdir}/issue
 
 %files -n rlc-pro-lts-repos
 %license docs/LICENSE
@@ -546,6 +558,12 @@ if tonumber(arg[2]) == 1 then
 end
 
 %changelog
+* Thu Nov 12 2026 Joseph Tate <jtate@ciq.com> - 9.6-3.6
+- Add ciq-rocky-release, owning /etc/os-release (link to /usr/lib/os-release),
+  /etc/issue, /etc/redhat-release and /etc/rocky-release, so installers that
+  match the /etc/os-release owner's name (MOFED) accept the package
+- Make /etc/redhat-release and /etc/system-release symlinks to rocky-release
+
 * Mon Oct 26 2026 Joseph Tate <jtate@ciq.com> - 9.6-3.5
 - Migrate to rlc-pro-lts-release (from ciq-lts96-rocky-release), matching the
   renamed Pro LTS package convention
